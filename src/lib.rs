@@ -25,8 +25,36 @@ impl Config {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let mut parser = Parser::new(&config)?;
+    let mut code_writer = CodeWriter::new(&config);
+
+    loop {
+        match parser.command_type() {
+            Some(CommandType::Push) => {
+                let cmd_type = parser.command_type().unwrap();
+                let arg1 = parser.arg1().unwrap();
+                let arg2 = parser.arg2().unwrap();
+                let assembly = Code::generate_push_pop(cmd_type, &arg1, arg2);
+                code_writer.add_assembly_code(&assembly);
+            },
+            Some(CommandType::Arithmetic) => {
+                let arg1 = parser.arg1().unwrap();
+                let assembly = Code::generate_arithmetic(&arg1);
+                code_writer.add_assembly_code(&assembly);
+            }
+            _ => (),
+        }
+
+        if !parser.has_more_lines() {
+            break;
+        }
+
+        parser.advance();
+    }
+
+    code_writer.write_to_file()?;
+
     // let mut assembler = HackAssembler::new(&config);
-    // let mut parser = Parser::new(&config)?;
     // let mut symbols = SymbolTable::new();
     //
     // // First pass
@@ -312,15 +340,18 @@ struct Code;
 impl Code {
     fn generate_arithmetic(command: &str) -> String {
         let mut assembly = String::new();
-        match str {
+        match command {
             "add" => {
                 assembly += "@SP\n";
                 assembly += "M=M-1\n";
+                assembly += "A=M\n";
                 assembly += "D=M\n";
+                assembly += "@SP\n";
                 assembly += "M=M-1\n";
-                assembly += "D=D+M\n";
-                assembly += "@R0\n";
-                assembly += "M=D\n";
+                assembly += "A=M\n";
+                assembly += "M=D+M\n";
+                assembly += "@SP\n";
+                assembly += "M=M+1\n";
             },
             "sub" => (),
             "neg" => (),
@@ -330,6 +361,7 @@ impl Code {
             "and" => (),
             "or" => (),
             "not" => (),
+            _ => (),
         }
 
         assembly
@@ -339,13 +371,15 @@ impl Code {
         let mut assembly = String::new();
         match segment {
             "constant" => {
-                match CommandType {
+                match command {
                     CommandType::Push => {
                         assembly += &format!("@{}\n", index);
                         assembly += "D=A\n";
                         assembly += "@SP\n";
+                        assembly += "A=M\n";
                         assembly += "M=D\n";
-                        assembly += "M=D\n";
+                        assembly += "@SP\n";
+                        assembly += "M=M+1\n";
                     },
                     _ => (),
                 }
